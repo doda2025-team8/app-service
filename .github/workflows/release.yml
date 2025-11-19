@@ -1,17 +1,17 @@
 name: Release App Service
 on: 
   push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"] # format should be v1.2.3
+    branches: ["main"]
 jobs:
   release:
     runs-on: ubuntu-24.04
     permissions: write-all
     steps:
     - uses: actions/checkout@v4
-    - name: Parse version info from tag
+    - name: Extract version from pom.xml
       run: |
-        # GITHUB_REF is like refs/tags/v2.3.5, so strip the first 11 chars
-        VERSION=${GITHUB_REF:11}
+        VERSION=$(xmllint --xpath "string(//*[local-name()='version'][1])" pom.xml)
+        VERSION=${VERSION#v}  # remove leading v if exists
         MAJOR=$(echo "$VERSION" | cut -d . -f 1)
         MINOR=$(echo "$VERSION" | cut -d . -f 2)
         PATCH=$(echo "$VERSION" | cut -d . -f 3)
