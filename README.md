@@ -2,7 +2,7 @@
 
 ## Supported arguments
 
-- **PORT** - Set the port used by nginx (default is `8081`)
+- **PORT** - Set the port used by nginx (default is `8080`)
 - **MODEL_HOST** - Set the model host (e.g. `http://localhost:8081`)
 
 ## Building the container
@@ -14,5 +14,5 @@ docker build -t app-service .
 ## Running the container
 
 ```bash
-docker run -p 8081:8081 -e MODEL_HOST="http://localhost:8081" app-service
+docker run -p 8080:8080 -e MODEL_HOST="http://localhost:8081" app-service
 ```
