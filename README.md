@@ -1,16 +1,18 @@
-# SMS Checker / Frontend
+# SMS Checker / app-frontend
 
-The frontend allows users to interact with the model in the backend through a web-based UI.
+## Supported arguments
 
-The frontend is implemented with Spring Boot and only consists of a website and one REST endpoint.
-It **requires Java 25+** to run (tested with 25.0.1).
-Any classification requests will be delegated to the `backend` service that serves the model.
-You must specify the environment variable `MODEL_HOST` to define where the backend is running.
+- **PORT** - Set the port used by nginx (default is `8081`)
+- **MODEL_HOST** - Set the model host (e.g. `http://localhost:8081`)
 
-The frontend service can be started through running the `Main` class (e.g., in your IDE) or through Maven (recommended):
+## Building the container
 
-    MODEL_HOST="http://localhost:8081" mvn spring-boot:run
+```bash
+docker build -t app-service .
+```
 
-The server runs on port 8080. Once its startup has finished, you can access [localhost:8080/sms](http://localhost:8080/sms) in your browser to interact with the application.
+## Running the container
 
-
+```bash
+docker run -p 8081:8081 -e MODEL_HOST="http://localhost:8081" app-service
+```
