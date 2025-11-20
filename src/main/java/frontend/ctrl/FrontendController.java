@@ -45,18 +45,6 @@ public class FrontendController {
         }
     }
 
-    @GetMapping("")
-    public String redirectToSlash(HttpServletRequest request) {
-        // relative REST requests in JS will end up on / and not on /sms
-        return "redirect:" + request.getRequestURI() + "/";
-    }
-
-    @GetMapping("/")
-    public String index(Model m) {
-        m.addAttribute("hostname", modelHost);
-        return "sms/index";
-    }
-
     @PostMapping({ "", "/" })
     @ResponseBody
     public Sms predict(@RequestBody Sms sms) {
