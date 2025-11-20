@@ -2,12 +2,8 @@ name: Release App Service
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual execution'
-        required: false
-        default: 'Manual test for F11 bump logic'
+  pull_request:
+    branches: ["image_pre_release"]
 jobs:
   release:
     runs-on: ubuntu-24.04
