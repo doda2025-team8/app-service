@@ -50,3 +50,8 @@ mvnw
 mvnw.cmd
 maven-wrapper.jar
 maven-wrapper.properties
+
+### Force tracking for Maven Wrapper files ###
+!mvnw
+!mvnw.cmd
+!.mvn/wrapper/maven-wrapper.properties
