@@ -11,15 +11,15 @@ jobs:
       contents: write #change to write to edit patch of version(v0.0.1-SNAPSHOT -> v0.0.1 offcially releasing)
       packages: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Set up Java/Maven Environment #need a Maven environment to use "versions:set"
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-
-      - name: Checkout code
-        uses: actions/checkout@v4
 
       - name: Extract version from pom.xml
         id: extract_version
