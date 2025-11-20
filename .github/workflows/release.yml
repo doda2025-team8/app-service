@@ -86,5 +86,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           
           git add pom.xml
-          git commit -m "chore(release): Bump version to $NEXT_VERSION after stable release."
+          git commit -m "chore(release): Bump version to $NEXT_VERSION after stable release [skip ci]."
           git push
