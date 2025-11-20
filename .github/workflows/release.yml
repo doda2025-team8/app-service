@@ -6,22 +6,36 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write #change to write to edit patch of version(v0.0.1-SNAPSHOT -> v0.0.1 offcially releasing)
       packages: write
     steps:
-      - name: Extract version from pom.xml
+      - name: Set up Java/Maven Environment #need a Maven environment to use "versions:set"
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Checkout code
         uses: actions/checkout@v4
-      - run: |
-          sudo apt-get install -y libxml2-utils
-          VERSION=$(xmllint --xpath "string(//*[local-name()='version'][1])" pom.xml)
-          VERSION=${VERSION#v}  # remove leading v if exists
-          MAJOR=$(echo "$VERSION" | cut -d . -f 1)
-          MINOR=$(echo "$VERSION" | cut -d . -f 2)
-          PATCH=$(echo "$VERSION" | cut -d . -f 3)
-          echo "version=$VERSION" >> $GITHUB_ENV
+
+      - name: Extract version from pom.xml
+        id: extract_version
+        run: |
+          FULL_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION_BASE=$(echo $FULL_VERSION | cut -d - -f 1)
+          MAJOR=$(echo "$VERSION_BASE" | cut -d . -f 1)
+          MINOR=$(echo "$VERSION_BASE" | cut -d . -f 2)
+          PATCH=$(echo "$VERSION_BASE" | cut -d . -f 3)
+          echo "VERSION_BASE=$VERSION_BASE" >> $GITHUB_ENV
+          echo "VERSION_FULL=$FULL_VERSION" >> $GITHUB_ENV
           echo "version_major=$MAJOR" >> $GITHUB_ENV
           echo "version_minor=$MINOR" >> $GITHUB_ENV
           echo "version_patch=$PATCH" >> $GITHUB_ENV
+
+      - name: Set stable version for build
+        run: |
+          ./mvnw versions:set -DnewVersion=${{ env.VERSION_BASE }} -B
 
       - name: Docker metadata
         id: meta
@@ -29,7 +43,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ env.version }}
+            type=raw,value=${{ env.VERSION_BASE }}
             type=raw,value=${{ env.version_major }}.${{ env.version_minor }}.latest
             type=raw,value=${{ env.version_major }}.latest
             type=raw,value=latest
@@ -55,3 +69,18 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Bump version to next snapshot after build and push
+        run: |
+          NEW_PATCH=$(( ${{env.version_patch}} + 1 ))
+          NEXT_VERSION="${{env.version_major}}.${{env.version_minor}}.${NEW_PATCH}-SNAPSHOT"
+
+          echo "Bumping from ${{env.VERSION_BASE}} to $NEXT_VERSION"
+          ./mvnw versions:set -DnewVersion=$NEXT_VERSION -B
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          
+          git add pom.xml
+          git commit -m "chore(release): Bump version to $NEXT_VERSION after stable release."
+          git push
