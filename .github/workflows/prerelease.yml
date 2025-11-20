@@ -31,7 +31,7 @@ jobs:
 
               TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
-              PRERELEASE_TAG="appservice-${VERSION_BASE}-${TIMESTAMP}-${BRANCH_NAME}"
+              PRERELEASE_TAG="${VERSION_BASE}-${TIMESTAMP}-${BRANCH_NAME}"
 
               echo "generated prerelease tag: $PRERELEASE_TAG"
               echo "tag=$PRERELEASE_TAG" >> $GITHUB_OUTPUT
