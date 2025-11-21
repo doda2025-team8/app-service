@@ -4,6 +4,8 @@
 
 - **PORT** - Set the port used by nginx (default is `8080`)
 - **MODEL_HOST** - Set the model host (e.g. `http://localhost:8081`)
+- **GITHUB_ACTOR**
+- **GITHUB_TOKEN**
 
 ## Building the container
 
