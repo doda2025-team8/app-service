@@ -2,7 +2,9 @@ package frontend.ctrl;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties.Meter;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
@@ -15,18 +17,45 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import frontend.data.Sms;
 import jakarta.servlet.http.HttpServletRequest;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge; 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 @Controller
 @RequestMapping(path = "/sms")
 public class FrontendController {
 
     private String modelHost;
-
     private RestTemplateBuilder rest;
 
-    public FrontendController(RestTemplateBuilder rest, Environment env) {
+    // Monitor Objects
+    private final MeterRegistry meterRegistry;
+    private final Counter requestCounter;
+    private final AtomicInteger activeRequests;
+    private final Timer processingTimer;
+
+    public FrontendController(RestTemplateBuilder rest, Environment env, MeterRegistry meterRegistry) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
+        this.meterRegistry = meterRegistry;
+
+        // Initialize Counters
+        this.requestCounter = Counter.builder("app_sms_requests_total")
+                .description("Total number of SMS requests")
+                .register(meterRegistry);
+
+        // Initialize Gauge
+        this.activeRequests = new AtomicInteger(0);
+        Gauge.builder("app_sms_active_requests", activeRequests, AtomicInteger::get)
+                .description("Number of requests currently being processed")
+                .register(meterRegistry);
+
+        // Initialize Timer
+        this.processingTimer = Timer.builder("app_sms_latency_seconds")
+                .description("Time taken to predict SMS")
+                .register(meterRegistry);
+
         assertModelHost();
     }
 
@@ -48,10 +77,25 @@ public class FrontendController {
     @PostMapping({ "", "/" })
     @ResponseBody
     public Sms predict(@RequestBody Sms sms) {
+        // Gauge +1 -> request started
+        activeRequests.incrementAndGet();
+        // Start timer
+        Timer.Sample sample = Timer.start(meterRegistry);
+
         System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
-        sms.result = getPrediction(sms);
-        System.out.printf("Prediction: %s\n", sms.result);
-        return sms;
+
+        try{
+            sms.result = getPrediction(sms);
+            // Request counter +1
+            requestCounter.increment();
+            System.out.printf("Prediction: %s\n", sms.result);
+            return sms;
+        } finally {
+            // Gauge -1 -> request ended
+            activeRequests.decrementAndGet();
+            // Stop timer
+            sample.stop(processingTimer);
+        }
     }
 
     private String getPrediction(Sms sms) {
