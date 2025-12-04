@@ -15,12 +15,12 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 
-    <repositories>
+    <!-- <repositories>
         <repository>
             <id>github-doda2025-team8</id>
             <url>https://maven.pkg.github.com/doda2025-team8/lib-version</url>
         </repository>
-    </repositories>
+    </repositories> -->
 
 
 	<properties>
@@ -28,15 +28,17 @@
 	</properties>
 
 	<dependencies>
-        <dependency>
+        <!-- <dependency>
             <groupId>doda25team8</groupId>
             <artifactId>lib-version</artifactId>
             <version>1.0.0</version>
-        </dependency>
+        </dependency> -->
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -44,10 +46,21 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+    	</dependency>
+
+    	<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+    	</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-	</dependencies>
+	
+ </dependencies>
 
 	<build>
 		<plugins>
