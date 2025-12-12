@@ -47,6 +47,9 @@ public class FrontendController {
         this.predictionCache = new ConcurrentHashMap<>();
         this.meterRegistry = meterRegistry;
 
+        // Get version from environment variable
+        String version = env.getProperty("APP_VERSION", "stable");
+
         // Initialize Counters
         this.requestCounter = Counter.builder("app_sms_requests_total")
                 .description("Total number of SMS requests")
@@ -60,23 +63,27 @@ public class FrontendController {
                 .description("Total number of cache misses")
                 .register(meterRegistry);
 
-        // Initialize Gauge
+        // Initialize Gauge with version tag
         this.activeRequests = new AtomicInteger(0);
         Gauge.builder("app_sms_active_requests", activeRequests, AtomicInteger::get)
                 .description("Number of requests currently being processed")
+                .tag("version", version)
                 .register(meterRegistry);
 
         Gauge.builder("app_cache_size", predictionCache, ConcurrentHashMap::size)
                 .description("Current number of entries in the cache")
+                .tag("version", version)
                 .register(meterRegistry);
 
-        // Initialize Timer
+        // Initialize Timer with version tag
         this.processingTimer = Timer.builder("app_sms_latency_seconds")
                 .description("Time taken to predict SMS")
+                .tag("version", version)
                 .register(meterRegistry);
 
         assertModelHost();
         System.out.printf("Cache enabled: %s\n", cacheEnabled);
+        System.out.printf("App version: %s\n", version);
     }
 
     private void assertModelHost() {
