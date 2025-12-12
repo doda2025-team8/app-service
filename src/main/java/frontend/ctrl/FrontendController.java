@@ -50,7 +50,7 @@ public class FrontendController {
         // Get version from environment variable
         String version = env.getProperty("APP_VERSION", "stable");
 
-        // Initialize Counters
+        // Initialize Counters with version tag
         this.requestCounter = Counter.builder("app_sms_requests_total")
                 .description("Total number of SMS requests")
                 .tag("version", version)
@@ -58,10 +58,12 @@ public class FrontendController {
 
         this.cacheHitsCounter = Counter.builder("app_cache_hits_total")
                 .description("Total number of cache hits")
+                .tag("version", version)
                 .register(meterRegistry);
 
         this.cacheMissesCounter = Counter.builder("app_cache_misses_total")
                 .description("Total number of cache misses")
+                .tag("version", version)
                 .register(meterRegistry);
 
         // Initialize Gauge with version tag
