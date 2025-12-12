@@ -53,6 +53,7 @@ public class FrontendController {
         // Initialize Counters
         this.requestCounter = Counter.builder("app_sms_requests_total")
                 .description("Total number of SMS requests")
+                .tag("version", version)
                 .register(meterRegistry);
 
         this.cacheHitsCounter = Counter.builder("app_cache_hits_total")
