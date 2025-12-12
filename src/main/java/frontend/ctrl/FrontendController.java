@@ -2,6 +2,7 @@ package frontend.ctrl;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties.Meter;
@@ -28,21 +29,35 @@ public class FrontendController {
 
     private String modelHost;
     private RestTemplateBuilder rest;
+    private boolean cacheEnabled;
+    private ConcurrentHashMap<String, String> predictionCache;
 
     // Monitor Objects
     private final MeterRegistry meterRegistry;
     private final Counter requestCounter;
+    private final Counter cacheHitsCounter;
+    private final Counter cacheMissesCounter;
     private final AtomicInteger activeRequests;
     private final Timer processingTimer;
 
     public FrontendController(RestTemplateBuilder rest, Environment env, MeterRegistry meterRegistry) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
+        this.cacheEnabled = Boolean.parseBoolean(env.getProperty("ENABLE_CACHE", "false"));
+        this.predictionCache = new ConcurrentHashMap<>();
         this.meterRegistry = meterRegistry;
 
         // Initialize Counters
         this.requestCounter = Counter.builder("app_sms_requests_total")
                 .description("Total number of SMS requests")
+                .register(meterRegistry);
+
+        this.cacheHitsCounter = Counter.builder("app_cache_hits_total")
+                .description("Total number of cache hits")
+                .register(meterRegistry);
+
+        this.cacheMissesCounter = Counter.builder("app_cache_misses_total")
+                .description("Total number of cache misses")
                 .register(meterRegistry);
 
         // Initialize Gauge
@@ -51,12 +66,17 @@ public class FrontendController {
                 .description("Number of requests currently being processed")
                 .register(meterRegistry);
 
+        Gauge.builder("app_cache_size", predictionCache, ConcurrentHashMap::size)
+                .description("Current number of entries in the cache")
+                .register(meterRegistry);
+
         // Initialize Timer
         this.processingTimer = Timer.builder("app_sms_latency_seconds")
                 .description("Time taken to predict SMS")
                 .register(meterRegistry);
 
         assertModelHost();
+        System.out.printf("Cache enabled: %s\n", cacheEnabled);
     }
 
     private void assertModelHost() {
@@ -85,7 +105,25 @@ public class FrontendController {
         System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
 
         try{
-            sms.result = getPrediction(sms);
+            // Check cache first if enabled
+            if (cacheEnabled && predictionCache.containsKey(sms.sms)) {
+                sms.result = predictionCache.get(sms.sms);
+                cacheHitsCounter.increment();
+                System.out.printf("Cache HIT: %s\n", sms.result);
+            } else {
+                // Cache miss or cache disabled
+                if (cacheEnabled) {
+                    cacheMissesCounter.increment();
+                    System.out.println("Cache MISS - calling model service");
+                }
+                sms.result = getPrediction(sms);
+                
+                // Store in cache if enabled
+                if (cacheEnabled) {
+                    predictionCache.put(sms.sms, sms.result);
+                }
+            }
+            
             // Request counter +1
             requestCounter.increment();
             System.out.printf("Prediction: %s\n", sms.result);

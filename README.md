@@ -4,6 +4,7 @@
 
 - **PORT** - Set the port used by nginx (default is `8080`)
 - **MODEL_HOST** - Set the model host (e.g. `http://localhost:8081`)
+- **ENABLE_CACHET** - Enable caching of model requests (`True` or `False`)
 - **GITHUB_ACTOR**
 - **GITHUB_TOKEN**
 
