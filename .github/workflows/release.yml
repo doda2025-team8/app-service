@@ -26,7 +26,7 @@ jobs:
       - name: Extract version from pom.xml
         id: extract_version
         run: |
-          FULL_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+          FULL_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           VERSION_BASE=$(echo $FULL_VERSION | cut -d - -f 1)
           MAJOR=$(echo "$VERSION_BASE" | cut -d . -f 1)
           MINOR=$(echo "$VERSION_BASE" | cut -d . -f 2)
@@ -39,7 +39,7 @@ jobs:
 
       - name: Set stable version for build
         run: |
-          ./mvnw versions:set -DnewVersion=${{ env.VERSION_BASE }} -B
+          mvn versions:set -DnewVersion=${{ env.VERSION_BASE }} -B
 
       - name: Docker metadata
         id: meta
@@ -83,7 +83,7 @@ jobs:
           NEXT_VERSION="${{env.version_major}}.${{env.version_minor}}.${NEW_PATCH}-SNAPSHOT"
 
           echo "Bumping from ${{env.VERSION_BASE}} to $NEXT_VERSION"
-          ./mvnw versions:set -DnewVersion=$NEXT_VERSION -B
+          mvn versions:set -DnewVersion=$NEXT_VERSION -B
 
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com

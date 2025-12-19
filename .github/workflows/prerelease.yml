@@ -24,7 +24,7 @@ jobs:
           - name: Generate unqiue prerelease tag
             id: prerelease_tag
             run: |
-              FULL_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+              FULL_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
               VERSION_BASE=$(echo $FULL_VERSION | cut -d - -f 1)
 
               BRANCH_NAME=$(echo ${{ github.ref_name }} | sed 's/\//-/g') #replace / with -
