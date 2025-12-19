@@ -14,7 +14,7 @@ jobs:
           - name: Checkout code
             uses: actions/checkout@v4
                 
-          - name: Set up Java/Maven Environment #need a Maven environment to use "versions:set"
+          - name: Set up Java/Maven Environment
             uses: actions/setup-java@v4
             with:
                 java-version: '25'
@@ -24,7 +24,7 @@ jobs:
           - name: Generate unqiue prerelease tag
             id: prerelease_tag
             run: |
-              FULL_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+              FULL_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
               VERSION_BASE=$(echo $FULL_VERSION | cut -d - -f 1)
 
               BRANCH_NAME=$(echo ${{ github.ref_name }} | sed 's/\//-/g') #replace / with -

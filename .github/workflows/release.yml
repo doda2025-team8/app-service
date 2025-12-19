@@ -2,13 +2,11 @@ name: Release App Service
 on:
   push:
     branches: ["main"]
-  # pull_request:
-  #   branches: ["main"]
 jobs:
   release:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write #change to write to edit patch of version(v0.0.1-SNAPSHOT -> v0.0.1 offcially releasing)
+      contents: write
       packages: write
     steps:
       - name: Checkout code
@@ -16,7 +14,7 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN }}
         
-      - name: Set up Java/Maven Environment #need a Maven environment to use "versions:set"
+      - name: Set up Java/Maven Environment
         uses: actions/setup-java@v4
         with:
           java-version: '25'
@@ -26,7 +24,7 @@ jobs:
       - name: Extract version from pom.xml
         id: extract_version
         run: |
-          FULL_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+          FULL_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           VERSION_BASE=$(echo $FULL_VERSION | cut -d - -f 1)
           MAJOR=$(echo "$VERSION_BASE" | cut -d . -f 1)
           MINOR=$(echo "$VERSION_BASE" | cut -d . -f 2)
@@ -39,7 +37,7 @@ jobs:
 
       - name: Set stable version for build
         run: |
-          ./mvnw versions:set -DnewVersion=${{ env.VERSION_BASE }} -B
+          mvn versions:set -DnewVersion=${{ env.VERSION_BASE }} -B
 
       - name: Docker metadata
         id: meta
@@ -83,7 +81,7 @@ jobs:
           NEXT_VERSION="${{env.version_major}}.${{env.version_minor}}.${NEW_PATCH}-SNAPSHOT"
 
           echo "Bumping from ${{env.VERSION_BASE}} to $NEXT_VERSION"
-          ./mvnw versions:set -DnewVersion=$NEXT_VERSION -B
+          mvn versions:set -DnewVersion=$NEXT_VERSION -B
 
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
