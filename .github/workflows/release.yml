@@ -2,13 +2,11 @@ name: Release App Service
 on:
   push:
     branches: ["main"]
-  # pull_request:
-  #   branches: ["main"]
 jobs:
   release:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write #change to write to edit patch of version(v0.0.1-SNAPSHOT -> v0.0.1 offcially releasing)
+      contents: write
       packages: write
     steps:
       - name: Checkout code
@@ -16,7 +14,7 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN }}
         
-      - name: Set up Java/Maven Environment #need a Maven environment to use "versions:set"
+      - name: Set up Java/Maven Environment
         uses: actions/setup-java@v4
         with:
           java-version: '25'
