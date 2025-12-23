@@ -31,7 +31,7 @@
         <dependency>
 			<groupId>doda2025-team8</groupId>
 			<artifactId>lib-version</artifactId>
-			<version>1.0.1-auto-release-fix-20251218153910</version>
+			<version>1.0.1</version>
 		</dependency>
 
 		<dependency>
