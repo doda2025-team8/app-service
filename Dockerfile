@@ -38,6 +38,10 @@ RUN mvn package -DskipTests
 # Stage 2: Run the application
 FROM eclipse-temurin:25-jre-alpine
 
+# Add default environment variables
+ENV PORT=8080
+ENV ENABLE_CACHE=True
+
 # Set the working directory in the container
 WORKDIR /app
 
