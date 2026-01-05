@@ -1,4 +1,4 @@
-# SMS Checker / app-frontend
+# App Service
 
 ## Supported arguments
 
