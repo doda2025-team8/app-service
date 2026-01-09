@@ -12,6 +12,7 @@ ARG GITHUB_TOKEN
 WORKDIR /app
 
 # Create settings.xml with GitHub authentication
+# https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry
 RUN mkdir -p /root/.m2 && \
     echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" \
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" \
@@ -19,7 +20,7 @@ RUN mkdir -p /root/.m2 && \
           https://maven.apache.org/xsd/settings-1.0.0.xsd"> \
       <servers> \
         <server> \
-          <id>github-doda2025-team8</id> \
+          <id>github</id> \
           <username>${GITHUB_ACTOR}</username> \
           <password>${GITHUB_TOKEN}</password> \
         </server> \
@@ -36,6 +37,10 @@ RUN mvn package -DskipTests
 
 # Stage 2: Run the application
 FROM eclipse-temurin:25-jre-alpine
+
+# Add default environment variables
+ENV PORT=8080
+ENV ENABLE_CACHE=True
 
 # Set the working directory in the container
 WORKDIR /app

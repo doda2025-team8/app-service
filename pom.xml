@@ -15,12 +15,12 @@
 		<relativePath />
 	</parent>
 
-    <!-- <repositories>
+    <repositories>
         <repository>
-            <id>github-doda2025-team8</id>
+            <id>github</id>
             <url>https://maven.pkg.github.com/doda2025-team8/lib-version</url>
         </repository>
-    </repositories> -->
+    </repositories>
 
 
 	<properties>
@@ -28,11 +28,11 @@
 	</properties>
 
 	<dependencies>
-        <!-- <dependency>
-            <groupId>doda25team8</groupId>
-            <artifactId>lib-version</artifactId>
-            <version>1.0.0</version>
-        </dependency> -->
+        <dependency>
+			<groupId>doda2025-team8</groupId>
+			<artifactId>lib-version</artifactId>
+			<version>1.0.1</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
