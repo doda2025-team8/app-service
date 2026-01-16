@@ -4,6 +4,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.env.Environment;
@@ -15,11 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import frontend.data.Sms;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 
 @Controller
 @RequestMapping(path = "/sms")
@@ -30,35 +27,103 @@ public class FrontendController {
     private boolean cacheEnabled;
     private ConcurrentHashMap<String, String> predictionCache;
 
-    // Monitor Objects
-    private final MeterRegistry meterRegistry;
-    private final AtomicInteger activeRequests;
+    //Monitor Objects
+    private final AtomicInteger activeRequests = new AtomicInteger(0);
     private final String appVersion;
 
-    public FrontendController(RestTemplateBuilder rest, Environment env, MeterRegistry meterRegistry) {
+    //Counter activeRequests
+    private final ConcurrentHashMap<String, AtomicLong> requestCounters = new ConcurrentHashMap<>();
+
+    //Latency (Histogram with buckets)
+    private final ConcurrentHashMap<String, DoubleAdder> latencySumMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> latencyCountMap = new ConcurrentHashMap<>();
+    private final double[] latencyBuckets = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0};
+    private final ConcurrentHashMap<String, ConcurrentHashMap<Double, AtomicLong>> latencyBucketCounts = new ConcurrentHashMap<>();
+
+    //Message Length
+    private final DoubleAdder msgLengthSum = new DoubleAdder();
+    private final AtomicLong msgLengthCount = new AtomicLong(0);
+
+    //UI Metrics
+    private final AtomicLong pageViews = new AtomicLong(0);
+
+    public FrontendController(RestTemplateBuilder rest, Environment env) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
         this.cacheEnabled = Boolean.parseBoolean(env.getProperty("ENABLE_CACHE", "false"));
         this.predictionCache = new ConcurrentHashMap<>();
-        this.meterRegistry = meterRegistry;
         this.appVersion = env.getProperty("APP_VERSION", "stable");
-
-        // Initialize Gauge - active requests
-        this.activeRequests = new AtomicInteger(0);
-        Gauge.builder("app_sms_active_requests", activeRequests, AtomicInteger::get)
-                .description("Number of requests currently being processed")
-                .tag("version", appVersion)
-                .register(meterRegistry);
-
-        // Initialize Gauge - cache size
-        Gauge.builder("app_cache_size", predictionCache, ConcurrentHashMap::size)
-                .description("Current number of entries in the cache")
-                .tag("version", appVersion)
-                .register(meterRegistry);
 
         assertModelHost();
         System.out.printf("Cache enabled: %s\n", cacheEnabled);
         System.out.printf("App version: %s\n", appVersion);
+    }
+
+    @GetMapping(value = "/metrics", produces = "text/plain; version=0.0.4; charset=utf-8")
+    @ResponseBody
+    public String getMetrics() {
+        StringBuilder sb = new StringBuilder();
+
+        // 1. Active Requests
+        sb.append("# HELP app_sms_active_requests Number of requests currently being processed\n");
+        sb.append("# TYPE app_sms_active_requests gauge\n");
+        sb.append(String.format("app_sms_active_requests{version=\"%s\"} %d\n\n", appVersion, activeRequests.get()));
+
+        // 2. Cache Size
+        sb.append("# HELP app_cache_size Current number of entries in the cache\n");
+        sb.append("# TYPE app_cache_size gauge\n");
+        sb.append(String.format("app_cache_size{version=\"%s\"} %d\n\n", appVersion, predictionCache.size()));
+
+        // 3. Requests Total
+        sb.append("# HELP app_sms_requests_total Total number of SMS requests\n");
+        sb.append("# TYPE app_sms_requests_total counter\n");
+        requestCounters.forEach((labelKey, count) -> {
+            // labelKey: result="spam",cache_status="miss"
+            sb.append(String.format("app_sms_requests_total{version=\"%s\",%s} %d\n", appVersion, labelKey, count.get()));
+        });
+        sb.append("\n");
+
+        // 4. Latency
+        sb.append("# HELP app_sms_latency_seconds Time taken to process SMS prediction\n");
+        sb.append("# TYPE app_sms_latency_seconds histogram\n");
+        latencySumMap.forEach((labelKey, sum) -> {
+            // Output bucket counts (cumulative)
+            ConcurrentHashMap<Double, AtomicLong> buckets = latencyBucketCounts.getOrDefault(labelKey, new ConcurrentHashMap<>());
+            long cumulative = 0;
+            for (double bucket : latencyBuckets) {
+                cumulative += buckets.getOrDefault(bucket, new AtomicLong(0)).get();
+                sb.append(String.format("app_sms_latency_seconds_bucket{version=\"%s\",%s,le=\"%s\"} %d\n",
+                    appVersion, labelKey, formatBucket(bucket), cumulative));
+            }
+            // +Inf bucket (equals total count)
+            long count = latencyCountMap.getOrDefault(labelKey, new AtomicLong(0)).get();
+            sb.append(String.format("app_sms_latency_seconds_bucket{version=\"%s\",%s,le=\"+Inf\"} %d\n",
+                appVersion, labelKey, count));
+            // Sum and count
+            sb.append(String.format("app_sms_latency_seconds_sum{version=\"%s\",%s} %f\n", appVersion, labelKey, sum.sum()));
+            sb.append(String.format("app_sms_latency_seconds_count{version=\"%s\",%s} %d\n", appVersion, labelKey, count));
+        });
+        sb.append("\n");
+
+        // 5. Message Length
+        sb.append("# HELP app_sms_message_length Distribution of SMS message lengths\n");
+        sb.append("# TYPE app_sms_message_length summary\n");
+        sb.append(String.format("app_sms_message_length_sum{version=\"%s\"} %f\n", appVersion, msgLengthSum.sum()));
+        sb.append(String.format("app_sms_message_length_count{version=\"%s\"} %d\n\n", appVersion, msgLengthCount.get()));
+
+        // 6. UI Page Views (Counter)
+        sb.append("# HELP app_ui_page_views_total Total number of UI page views\n");
+        sb.append("# TYPE app_ui_page_views_total counter\n");
+        sb.append(String.format("app_ui_page_views_total{version=\"%s\"} %d\n\n", appVersion, pageViews.get()));
+
+        return sb.toString();
+    }
+
+    private String formatBucket(double bucket) {
+        if (bucket == (long) bucket) {
+            return String.valueOf((long) bucket);
+        }
+        return String.valueOf(bucket);
     }
 
     private void assertModelHost() {
@@ -76,11 +141,18 @@ public class FrontendController {
         }
     }
 
+    @PostMapping("/pageview")
+    @ResponseBody
+    public String trackPageView() {
+        pageViews.incrementAndGet();
+        return "ok";
+    }
+
     @PostMapping({ "", "/" })
     @ResponseBody
     public Sms predict(@RequestBody Sms sms) {
         activeRequests.incrementAndGet();
-        Timer.Sample sample = Timer.start(meterRegistry);
+        long startTime = System.nanoTime();
 
         System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
 
@@ -110,34 +182,26 @@ public class FrontendController {
 
         } finally {
             activeRequests.decrementAndGet();
+            long durationNanos = System.nanoTime() - startTime;
+            double durationSeconds = durationNanos / 1_000_000_000.0;
 
-            // Counter with labels: version, result (spam/ham), cache_status
-            Counter.builder("app_sms_requests_total")
-                    .description("Total number of SMS requests")
-                    .tag("version", appVersion)
-                    .tag("result", result)
-                    .tag("cache_status", cacheStatus)
-                    .register(meterRegistry)
-                    .increment();
+            String labelKey = String.format("result=\"%s\",cache_status=\"%s\"", result, cacheStatus);
+            requestCounters.computeIfAbsent(labelKey, k -> new AtomicLong(0)).incrementAndGet();
 
-            // Timer/Histogram with labels and percentile histograms enabled
-            sample.stop(Timer.builder("app_sms_latency_seconds")
-                    .description("Time taken to process SMS prediction")
-                    .tag("version", appVersion)
-                    .tag("result", result)
-                    .tag("cache_status", cacheStatus)
-                    .publishPercentileHistogram(true)  // THIS ENABLES HISTOGRAM BUCKETS
-                    .publishPercentiles(0.5, 0.95, 0.99)  // Also publish specific percentiles
-                    .register(meterRegistry));
+            latencySumMap.computeIfAbsent(labelKey, k -> new DoubleAdder()).add(durationSeconds);
+            latencyCountMap.computeIfAbsent(labelKey, k -> new AtomicLong(0)).incrementAndGet();
 
-            // Explicit Histogram for SMS message length distribution
-            DistributionSummary.builder("app_sms_message_length")
-                    .description("Distribution of SMS message lengths")
-                    .tag("version", appVersion)
-                    .tag("result", result)
-                    .publishPercentileHistogram(true)
-                    .register(meterRegistry)
-                    .record(sms.sms != null ? sms.sms.length() : 0);
+            ConcurrentHashMap<Double, AtomicLong> buckets = latencyBucketCounts.computeIfAbsent(labelKey, k -> new ConcurrentHashMap<>());
+            for (double bucket : latencyBuckets) {
+                if (durationSeconds <= bucket) {
+                    buckets.computeIfAbsent(bucket, k -> new AtomicLong(0)).incrementAndGet();
+                    break;
+                }
+            }
+
+            int length = (sms.sms != null) ? sms.sms.length() : 0;
+            msgLengthSum.add(length);
+            msgLengthCount.incrementAndGet();
         }
     }
 
