@@ -4,7 +4,6 @@
 
 - **PORT** - RUNTIME - Set the port used (default is `8080`)
 - **MODEL_HOST** - RUNTIME - Set the model host (e.g. `http://localhost:8081`)
-- **ENABLE_CACHE** - RUNTIME - Enable caching of model requests (`True` or `False`)
 - **GITHUB_ACTOR** - BUILD-TIME - The Github actor
 - **GITHUB_TOKEN** - BUILD-TIME - A github token required for maven authentication.
 
