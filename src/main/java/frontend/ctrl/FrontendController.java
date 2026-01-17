@@ -24,8 +24,6 @@ public class FrontendController {
 
     private String modelHost;
     private RestTemplateBuilder rest;
-    private boolean cacheEnabled;
-    private ConcurrentHashMap<String, String> predictionCache;
 
     //Monitor Objects
     private final AtomicInteger activeRequests = new AtomicInteger(0);
@@ -50,12 +48,9 @@ public class FrontendController {
     public FrontendController(RestTemplateBuilder rest, Environment env) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
-        this.cacheEnabled = Boolean.parseBoolean(env.getProperty("ENABLE_CACHE", "false"));
-        this.predictionCache = new ConcurrentHashMap<>();
         this.appVersion = env.getProperty("APP_VERSION", "stable");
 
         assertModelHost();
-        System.out.printf("Cache enabled: %s\n", cacheEnabled);
         System.out.printf("App version: %s\n", appVersion);
     }
 
@@ -69,16 +64,11 @@ public class FrontendController {
         sb.append("# TYPE app_sms_active_requests gauge\n");
         sb.append(String.format("app_sms_active_requests{version=\"%s\"} %d\n\n", appVersion, activeRequests.get()));
 
-        // 2. Cache Size
-        sb.append("# HELP app_cache_size Current number of entries in the cache\n");
-        sb.append("# TYPE app_cache_size gauge\n");
-        sb.append(String.format("app_cache_size{version=\"%s\"} %d\n\n", appVersion, predictionCache.size()));
-
         // 3. Requests Total
         sb.append("# HELP app_sms_requests_total Total number of SMS requests\n");
         sb.append("# TYPE app_sms_requests_total counter\n");
         requestCounters.forEach((labelKey, count) -> {
-            // labelKey: result="spam",cache_status="miss"
+            // labelKey: result="spam"
             sb.append(String.format("app_sms_requests_total{version=\"%s\",%s} %d\n", appVersion, labelKey, count.get()));
         });
         sb.append("\n");
@@ -156,26 +146,10 @@ public class FrontendController {
 
         System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
 
-        String cacheStatus = "disabled";
         String result = "unknown";
 
         try {
-            if (cacheEnabled && predictionCache.containsKey(sms.sms)) {
-                sms.result = predictionCache.get(sms.sms);
-                cacheStatus = "hit";
-                System.out.printf("Cache HIT: %s\n", sms.result);
-            } else {
-                if (cacheEnabled) {
-                    cacheStatus = "miss";
-                    System.out.println("Cache MISS - calling model service");
-                }
-                sms.result = getPrediction(sms);
-
-                if (cacheEnabled) {
-                    predictionCache.put(sms.sms, sms.result);
-                }
-            }
-
+            sms.result = getPrediction(sms);
             result = sms.result != null ? sms.result.toLowerCase() : "unknown";
             System.out.printf("Prediction: %s\n", sms.result);
             return sms;
@@ -185,7 +159,7 @@ public class FrontendController {
             long durationNanos = System.nanoTime() - startTime;
             double durationSeconds = durationNanos / 1_000_000_000.0;
 
-            String labelKey = String.format("result=\"%s\",cache_status=\"%s\"", result, cacheStatus);
+            String labelKey = String.format("result=\"%s\"", result);
             requestCounters.computeIfAbsent(labelKey, k -> new AtomicLong(0)).incrementAndGet();
 
             latencySumMap.computeIfAbsent(labelKey, k -> new DoubleAdder()).add(durationSeconds);
